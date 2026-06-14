@@ -1,0 +1,35 @@
+name: Download Cache and Upload Artifact
+
+on:
+  workflow_dispatch:
+    inputs:
+      cache_key:
+        description: 'Exact Cache Key to download (e.g., macOS-ccache-123456-1)'
+        required: true
+        type: string
+
+jobs:
+  cache-extract:
+    # ubuntu-latest is perfect here: it's cheaper, spins up instantly, 
+    # and we just need a generic Linux runner to download and zip files.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # Use 'restore' instead of the generic 'cache' action.
+      # This guarantees it ONLY downloads and doesn't attempt to 
+      # re-save the exact same cache at the end of the job run.
+      - name: Restore ccache
+        uses: actions/cache/restore@v5
+        with:
+          path: .ccache
+          key: ${{ inputs.cache_key }}
+          fail-on-cache-miss: true
+
+      - name: Upload ccache as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: extracted-ccache-artifact
+          path: .ccache
+          retention-days: 7
