@@ -84,7 +84,7 @@ jobs:
           key: ${{ runner.os }}-ccache-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload Wine Build Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wine-${{ steps.wine_version.outputs.tag }}-${{ github.run_id }}
           path: output/
@@ -98,22 +98,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download Build Artifact
-        uses: actions/download-artifact@v4
+
+      - name: Download Build Artifact Zip
+        uses: actions/download-artifact@v8
         with:
           name: wine-${{ needs.build.outputs.wine_tag }}-${{ github.run_id }}
           path: output/
+          skip-decompress: true
 
-      - name: Package Output
+      - name: Rename and Prepare Zip
         run: |
-          tar -cJf "${{ needs.build.outputs.wine_tarball }}" -C output .
-          echo "Tarball size: $(du -sh ${{ needs.build.outputs.wine_tarball }} | cut -f1)"
+          mv output/wine-${{ needs.build.outputs.wine_tag }}-${{ github.run_id }}.zip wine-${{ needs.build.outputs.wine_tag }}.zip
+          echo "Zip size: $(du -sh wine-${{ needs.build.outputs.wine_tag }}.zip | cut -f1)"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.build.outputs.wine_tag }}
           name: ${{ needs.build.outputs.wine_tag }}
-          files: ${{ needs.build.outputs.wine_tarball }}
+          files: wine-${{ needs.build.outputs.wine_tag }}.zip
           generate_release_notes: true
           make_latest: true
