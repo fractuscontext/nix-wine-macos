@@ -77,6 +77,7 @@
               --without-inotify \
               --with-sdl \
               --with-vulkan \
+              --with-opengl \
               --with-pthread \
               --without-x \
               --without-wayland \
@@ -91,9 +92,10 @@
               --without-udev \
               --without-v4l2 \
               --without-pcsclite \
-              --without-opengl \
+              --without-cups \
               --without-usb \
               --without-capi \
+              --without-pcap \
               --without-unwind \
               --without-opencl \
               --disable-win16 \
@@ -151,24 +153,28 @@
             UNIX_DIR="''${root_dir}/output/wow64/usr/local/lib/wine/x86_64-unix"
 
             # Bypassing strict Khronos vulkan-loader to avoid VK_ERROR_INCOMPATIBLE_DRIVER (res -9).
-            # Wine explicitly dlopens "libvulkan.1.dylib", so we mask MoltenVK as the loader 
+            # Wine explicitly dlopens "libvulkan.1.dylib", so we mask MoltenVK as the loader
             # to feed Vulkan calls directly to Metal without portability flag restrictions.
             cp ${pkgs.moltenvk}/lib/libMoltenVK*.dylib "$UNIX_DIR/"
             ln -sf libMoltenVK.dylib "$UNIX_DIR/libvulkan.1.dylib"
+
+            # ANGLE EGL/GLES — required by Steam and modern Wine EGL path.
+            # Wine dlopens "libEGL.dylib" and "libGLESv2.dylib" at runtime.
+            cp ${pkgs.lib.getLib pkgs.angle}/lib/libEGL*.dylib "$UNIX_DIR/"
 
             cp ${pkgs.libpng}/lib/libpng*.dylib "$UNIX_DIR/"
             cp ${pkgs.lib.getLib pkgs.lcms2}/lib/liblcms2*.dylib "$UNIX_DIR/"
             cp ${pkgs.SDL2}/lib/libSDL2*.dylib "$UNIX_DIR/"
 
             # Copy FreeType and its transitive dependencies.
-            # Without zlib, bzip2, and brotli, dlopen() on libfreetype will 
+            # Without zlib, bzip2, and brotli, dlopen() on libfreetype will
             # silently fail, causing Wine to throw a false 'FreeType not found' error.
             cp ${pkgs.freetype}/lib/libfreetype*.dylib "$UNIX_DIR/"
             cp ${pkgs.lib.getLib pkgs.zlib}/lib/libz*.dylib "$UNIX_DIR/"
             cp ${pkgs.lib.getLib pkgs.bzip2}/lib/libbz2*.dylib "$UNIX_DIR/"
             cp ${pkgs.lib.getLib pkgs.brotli}/lib/libbrotli*.dylib "$UNIX_DIR/"
 
-            # TLS and crypto dependencies (REMOVED libiconv, libcharset, libintl)
+            # TLS and crypto dependencies
             cp ${pkgs.lib.getLib pkgs.gnutls}/lib/libgnutls*.dylib "$UNIX_DIR/"
             cp ${pkgs.lib.getLib pkgs.nettle}/lib/libnettle*.dylib "$UNIX_DIR/"
             cp ${pkgs.lib.getLib pkgs.nettle}/lib/libhogweed*.dylib "$UNIX_DIR/"
@@ -189,7 +195,7 @@
 
             for libfile in "$UNIX_DIR"/*.dylib "$UNIX_DIR"/*.so; do
               # Skip if the glob didn't match anything
-              [ -e "$libfile" ] || continue 
+              [ -e "$libfile" ] || continue
 
               LIB_NAME=$(basename "$libfile")
               echo "Processing: $LIB_NAME"
@@ -203,7 +209,7 @@
                   install_name_tool -change "$dep" "@loader_path/$DEP_NAME" "$libfile"
                 fi
               done
-              
+
               echo "  -> Setting library ID: @loader_path/$LIB_NAME"
               install_name_tool -id "@loader_path/$LIB_NAME" "$libfile"
             done
@@ -240,6 +246,7 @@
               pkgs.ffmpeg
               pkgs.gst_all_1.gstreamer
               pkgs.gst_all_1.gst-plugins-base
+              pkgs.angle
 
               pkgs.pkgsCross.mingwW64.buildPackages.gcc
               pkgs.pkgsCross.mingwW64.buildPackages.binutils
@@ -256,7 +263,6 @@
               export xcrun_nocache=1
               export MACOSX_DEPLOYMENT_TARGET="14.0"
 
-              # Manually point pkg-config to the .dev outputs of our libraries
               export PKG_CONFIG_PATH="${
                 pkgs.lib.makeSearchPathOutput "dev" "lib/pkgconfig" (
                   with pkgs;
@@ -270,6 +276,7 @@
                     ffmpeg
                     gst_all_1.gstreamer
                     gst_all_1.gst-plugins-base
+                    angle
                   ]
                 )
               }:$PKG_CONFIG_PATH"
@@ -288,6 +295,7 @@
                     freetype
                     vulkan-loader
                     moltenvk
+                    angle
                   ]
                 )
               }:$DYLD_LIBRARY_PATH"
@@ -297,8 +305,10 @@
                 -L${pkgs.libinotify-kqueue}/lib \
                 -L${pkgs.moltenvk}/lib \
                 -L${pkgs.vulkan-loader}/lib \
+                -L${pkgs.angle}/lib \
                 -isysroot $SDKROOT \
                 -F$SDKROOT/System/Library/Frameworks"
+
               export CCACHE_DIR="$(pwd)/.ccache"
               export CCACHE_BASEDIR="$(pwd)"
               export CCACHE_COMPILERCHECK=content
@@ -307,7 +317,6 @@
               rm -r "$CCACHE_DIR/bin" 2>/dev/null || true
               mkdir -p "$CCACHE_DIR/bin"
 
-              # Hijack native Apple compilers
               ln -sf "${pkgs.ccache}/bin/ccache" "$CCACHE_DIR/bin/clang"
               ln -sf "${pkgs.ccache}/bin/ccache" "$CCACHE_DIR/bin/clang++"
               ln -sf "${pkgs.ccache}/bin/ccache" "$CCACHE_DIR/bin/cc"
