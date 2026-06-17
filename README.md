@@ -127,8 +127,7 @@ tools/winegcc/winegcc -o dlls/atmlib/x86_64-windows/atmlib.dll \
 ### Finding Nix Packages
 
 ```bash
-temp_pkg=pkgsCross.mingw32.SDL2  # Package you are looking for
-nix shell "nixpkgs#$temp_pkg" -c bash -c "cd \$(nix eval nixpkgs#$temp_pkg.outPath --raw) && exec bash"
+temp_pkg="angle" && nix shell "nixpkgs#legacyPackages.x86_64-darwin.$temp_pkg" -c bash -c "cd \$(nix eval --raw nixpkgs#legacyPackages.x86_64-darwin.$temp_pkg.outPath) && exec bash"
 ```
 
 ## Testing DXMT & MoltenVK

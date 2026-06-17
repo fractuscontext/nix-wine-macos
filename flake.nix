@@ -58,8 +58,8 @@
             make clean || true
 
             CC="clang" CXX="clang++" \
-            i386_CC="ccache i686-w64-mingw32-gcc" \
-            x86_64_CC="ccache x86_64-w64-mingw32-gcc" \
+            i386_CC="i686-w64-mingw32-gcc" \
+            x86_64_CC="x86_64-w64-mingw32-gcc" \
             ./configure \
               --build=x86_64-apple-darwin \
               --enable-archs=x86_64,i386 \
@@ -77,7 +77,7 @@
               --without-inotify \
               --with-sdl \
               --with-vulkan \
-              --with-opengl \
+              --without-opengl \
               --with-pthread \
               --without-x \
               --without-wayland \
@@ -158,10 +158,6 @@
             cp ${pkgs.moltenvk}/lib/libMoltenVK*.dylib "$UNIX_DIR/"
             ln -sf libMoltenVK.dylib "$UNIX_DIR/libvulkan.1.dylib"
 
-            # ANGLE EGL/GLES — required by Steam and modern Wine EGL path.
-            # Wine dlopens "libEGL.dylib" and "libGLESv2.dylib" at runtime.
-            cp ${pkgs.lib.getLib pkgs.angle}/lib/libEGL*.dylib "$UNIX_DIR/"
-
             cp ${pkgs.libpng}/lib/libpng*.dylib "$UNIX_DIR/"
             cp ${pkgs.lib.getLib pkgs.lcms2}/lib/liblcms2*.dylib "$UNIX_DIR/"
             cp ${pkgs.SDL2}/lib/libSDL2*.dylib "$UNIX_DIR/"
@@ -191,6 +187,10 @@
             cp ${pkgs.lib.getLib pkgs.glib}/lib/libgobject*.dylib "$UNIX_DIR/"
             cp ${pkgs.lib.getLib pkgs.glib}/lib/libgmodule*.dylib "$UNIX_DIR/"
 
+            cp ${pkgs.lib.getLib pkgs.angle}/lib/libEGL*.dylib "$UNIX_DIR/"
+            cp ${pkgs.lib.getLib pkgs.angle}/lib/libGLESv2*.dylib "$UNIX_DIR/"
+
+
             chmod +w "$UNIX_DIR"/*.dylib
 
             for libfile in "$UNIX_DIR"/*.dylib "$UNIX_DIR"/*.so; do
@@ -200,7 +200,7 @@
               LIB_NAME=$(basename "$libfile")
               echo "Processing: $LIB_NAME"
 
-              NIX_DEPS=$(otool -L "$libfile" | grep "/nix/store" | awk '{print $1}')
+              NIX_DEPS=$(otool -L "$libfile" | awk '/\/nix\/store/ {print $1}')
               for dep in $NIX_DEPS; do
                 DEP_NAME=$(basename "$dep")
                 
@@ -213,10 +213,7 @@
               echo "  -> Setting library ID: @loader_path/$LIB_NAME"
               install_name_tool -id "@loader_path/$LIB_NAME" "$libfile"
             done
-
             echo "Relinking complete!"
-
-            exit 0
           '';
 
         in
@@ -261,7 +258,7 @@
               export xcrun_log=1
               export xcrun_verbose=1
               export xcrun_nocache=1
-              export MACOSX_DEPLOYMENT_TARGET="14.0"
+              export MACOSX_DEPLOYMENT_TARGET="15.0"
 
               export PKG_CONFIG_PATH="${
                 pkgs.lib.makeSearchPathOutput "dev" "lib/pkgconfig" (
@@ -284,14 +281,13 @@
               export SDKROOT="${pkgs.apple-sdk_15}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
 
               export CFLAGS="\
-                -mmacosx-version-min=14.0 \
+                -mmacosx-version-min=15.0 \
                 -isysroot $SDKROOT"
 
               export DYLD_LIBRARY_PATH="${
                 pkgs.lib.makeLibraryPath (
                   with pkgs;
                   [
-                    libinotify-kqueue
                     freetype
                     vulkan-loader
                     moltenvk
@@ -301,8 +297,7 @@
               }:$DYLD_LIBRARY_PATH"
 
               export LDFLAGS="\
-                -mmacosx-version-min=14.0 \
-                -L${pkgs.libinotify-kqueue}/lib \
+                -mmacosx-version-min=15.0 \
                 -L${pkgs.moltenvk}/lib \
                 -L${pkgs.vulkan-loader}/lib \
                 -L${pkgs.angle}/lib \
@@ -321,6 +316,27 @@
               ln -sf "${pkgs.ccache}/bin/ccache" "$CCACHE_DIR/bin/clang++"
               ln -sf "${pkgs.ccache}/bin/ccache" "$CCACHE_DIR/bin/cc"
               ln -sf "${pkgs.ccache}/bin/ccache" "$CCACHE_DIR/bin/c++"
+
+              # ===== WINGW HIJACK STARTS
+
+              # Hijack MinGW compilers via Wrapper Scripts to prevent macOS EPERM under winebuild
+              echo '#!/usr/bin/env bash' > "$CCACHE_DIR/bin/i686-w64-mingw32-gcc"
+              echo 'exec ${pkgs.ccache}/bin/ccache ${pkgs.pkgsCross.mingw32.buildPackages.gcc}/bin/i686-w64-mingw32-gcc "$@"' >> "$CCACHE_DIR/bin/i686-w64-mingw32-gcc"
+              chmod +x "$CCACHE_DIR/bin/i686-w64-mingw32-gcc"
+
+              echo '#!/usr/bin/env bash' > "$CCACHE_DIR/bin/i686-w64-mingw32-g++"
+              echo 'exec ${pkgs.ccache}/bin/ccache ${pkgs.pkgsCross.mingw32.buildPackages.gcc}/bin/i686-w64-mingw32-g++ "$@"' >> "$CCACHE_DIR/bin/i686-w64-mingw32-g++"
+              chmod +x "$CCACHE_DIR/bin/i686-w64-mingw32-g++"
+
+              echo '#!/usr/bin/env bash' > "$CCACHE_DIR/bin/x86_64-w64-mingw32-gcc"
+              echo 'exec ${pkgs.ccache}/bin/ccache ${pkgs.pkgsCross.mingwW64.buildPackages.gcc}/bin/x86_64-w64-mingw32-gcc "$@"' >> "$CCACHE_DIR/bin/x86_64-w64-mingw32-gcc"
+              chmod +x "$CCACHE_DIR/bin/x86_64-w64-mingw32-gcc"
+
+              echo '#!/usr/bin/env bash' > "$CCACHE_DIR/bin/x86_64-w64-mingw32-g++"
+              echo 'exec ${pkgs.ccache}/bin/ccache ${pkgs.pkgsCross.mingwW64.buildPackages.gcc}/bin/x86_64-w64-mingw32-g++ "$@"' >> "$CCACHE_DIR/bin/x86_64-w64-mingw32-g++"
+              chmod +x "$CCACHE_DIR/bin/x86_64-w64-mingw32-g++"
+
+              # ===== WINGW HIJACK ENDS
 
               export PATH="$CCACHE_DIR/bin:$PATH"
 
