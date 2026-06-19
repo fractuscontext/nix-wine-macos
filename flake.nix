@@ -153,58 +153,89 @@
             echo "Bundling external runtime dependencies natively..."
             UNIX_DIR="''${root_dir}/output/wow64/usr/local/lib/wine/x86_64-unix"
 
+            if [ ! -d "$UNIX_DIR" ]; then
+              echo "Error: $UNIX_DIR not found. Run install-wow64 first."
+              exit 1
+            fi
+
+            # Copy matching libs without aborting when a glob matches nothing.
+            # cp with an unexpanded glob would fail under set -e, so we iterate.
+            copy_libs() {
+              local matched=0
+              local f
+              for f in $1; do
+                [ -e "$f" ] || continue
+                cp "$f" "$UNIX_DIR/"
+                matched=1
+              done
+              if [ "$matched" -eq 0 ]; then
+                echo "  !! WARNING: no files matched: $1"
+              fi
+            }
+
             # Bypassing strict Khronos vulkan-loader to avoid VK_ERROR_INCOMPATIBLE_DRIVER (res -9).
             # Wine explicitly dlopens "libvulkan.1.dylib", so we mask MoltenVK as the loader
             # to feed Vulkan calls directly to Metal without portability flag restrictions.
-            cp ${pkgs.moltenvk}/lib/libMoltenVK*.dylib "$UNIX_DIR/"
+            copy_libs "${pkgs.moltenvk}/lib/libMoltenVK*.dylib"
             ln -sf libMoltenVK.dylib "$UNIX_DIR/libvulkan.1.dylib"
 
-            cp ${pkgs.libpng}/lib/libpng*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.lcms2}/lib/liblcms2*.dylib "$UNIX_DIR/"
-            cp ${pkgs.SDL2}/lib/libSDL2*.dylib "$UNIX_DIR/"
+            copy_libs "${pkgs.libpng}/lib/libpng*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.lcms2}/lib/liblcms2*.dylib"
+            copy_libs "${pkgs.SDL2}/lib/libSDL2*.dylib"
 
             # Copy FreeType and its transitive dependencies.
             # Without zlib, bzip2, and brotli, dlopen() on libfreetype will
             # silently fail, causing Wine to throw a false 'FreeType not found' error.
-            cp ${pkgs.freetype}/lib/libfreetype*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.zlib}/lib/libz*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.bzip2}/lib/libbz2*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.brotli}/lib/libbrotli*.dylib "$UNIX_DIR/"
+            copy_libs "${pkgs.freetype}/lib/libfreetype*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.zlib}/lib/libz*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.bzip2}/lib/libbz2*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.brotli}/lib/libbrotli*.dylib"
 
             # TLS and crypto dependencies
-            cp ${pkgs.lib.getLib pkgs.gnutls}/lib/libgnutls*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.nettle}/lib/libnettle*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.nettle}/lib/libhogweed*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.gmp}/lib/libgmp*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.p11-kit}/lib/libp11-kit*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.libtasn1}/lib/libtasn1*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.libidn2}/lib/libidn2*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.libunistring}/lib/libunistring*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.libffi}/lib/libffi*.dylib "$UNIX_DIR/"
+            copy_libs "${pkgs.lib.getLib pkgs.gnutls}/lib/libgnutls*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.nettle}/lib/libnettle*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.nettle}/lib/libhogweed*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.gmp}/lib/libgmp*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.p11-kit}/lib/libp11-kit*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.libtasn1}/lib/libtasn1*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.libidn2}/lib/libidn2*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.libunistring}/lib/libunistring*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.libffi}/lib/libffi*.dylib"
 
-            cp ${pkgs.lib.getLib pkgs.gst_all_1.gstreamer}/lib/libgst*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.gst_all_1.gst-plugins-base}/lib/libgst*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.glib}/lib/libglib*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.glib}/lib/libgobject*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.glib}/lib/libgmodule*.dylib "$UNIX_DIR/"
+            copy_libs "${pkgs.lib.getLib pkgs.gst_all_1.gstreamer}/lib/libgst*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.gst_all_1.gst-plugins-base}/lib/libgst*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.glib}/lib/libglib*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.glib}/lib/libgobject*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.glib}/lib/libgmodule*.dylib"
 
-            cp ${pkgs.lib.getLib pkgs.angle}/lib/libEGL*.dylib "$UNIX_DIR/"
-            cp ${pkgs.lib.getLib pkgs.angle}/lib/libGLESv2*.dylib "$UNIX_DIR/"
+            # ANGLE: these dylibs are NOT linked against /nix/store paths.
+            # They use @rpath/@loader_path among themselves, so the relink loop
+            # below correctly finds zero /nix/store deps for them (awk, not grep,
+            # so a zero-match does not abort under set -e).
+            copy_libs "${pkgs.lib.getLib pkgs.angle}/lib/libEGL*.dylib"
+            copy_libs "${pkgs.lib.getLib pkgs.angle}/lib/libGLESv2*.dylib"
 
+            # Make everything writable. nullglob guards against an empty dir.
+            shopt -s nullglob
+            dylibs=( "$UNIX_DIR"/*.dylib "$UNIX_DIR"/*.so )
+            shopt -u nullglob
 
-            chmod +w "$UNIX_DIR"/*.dylib
+            if [ ''${#dylibs[@]} -eq 0 ]; then
+              echo "Error: no dylibs/so were bundled into $UNIX_DIR"
+              exit 1
+            fi
 
-            for libfile in "$UNIX_DIR"/*.dylib "$UNIX_DIR"/*.so; do
-              # Skip if the glob didn't match anything
-              [ -e "$libfile" ] || continue
+            chmod +w "''${dylibs[@]}"
 
+            for libfile in "''${dylibs[@]}"; do
               LIB_NAME=$(basename "$libfile")
               echo "Processing: $LIB_NAME"
 
+              # awk (not grep) so zero /nix/store matches still exits 0 under set -e.
+              # ANGLE libs hit this path and legitimately produce no deps here.
               NIX_DEPS=$(otool -L "$libfile" | awk '/\/nix\/store/ {print $1}')
               for dep in $NIX_DEPS; do
                 DEP_NAME=$(basename "$dep")
-                
                 if [ -f "$UNIX_DIR/$DEP_NAME" ]; then
                   echo "  -> Relinking dependency: $DEP_NAME"
                   install_name_tool -change "$dep" "@loader_path/$DEP_NAME" "$libfile"
@@ -214,7 +245,31 @@
               echo "  -> Setting library ID: @loader_path/$LIB_NAME"
               install_name_tool -id "@loader_path/$LIB_NAME" "$libfile"
             done
+
             echo "Relinking complete!"
+
+            # Verification pass: surface any /nix/store dep that was NOT bundled.
+            # This is the silent-failure class your FreeType/zlib comment fights.
+            echo "Verifying no unbundled /nix/store refs remain..."
+            leftover=0
+            for libfile in "''${dylibs[@]}"; do
+              while IFS= read -r dep; do
+                DEP_NAME=$(basename "$dep")
+                if [ ! -f "$UNIX_DIR/$DEP_NAME" ]; then
+                  echo "  !! $(basename "$libfile") -> MISSING bundled copy of: $dep"
+                  leftover=1
+                fi
+              done < <(otool -L "$libfile" | awk '/\/nix\/store/ {print $1}')
+            done
+
+            if [ "$leftover" -ne 0 ]; then
+              echo "WARNING: some /nix/store dependencies were not bundled (see above)."
+              echo "These will fail to resolve outside the nix shell."
+            else
+              echo "All /nix/store dependencies accounted for."
+            fi
+
+            echo "Bundling complete."
           '';
 
         in
