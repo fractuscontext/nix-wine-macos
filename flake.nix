@@ -60,6 +60,7 @@
             CC="clang" CXX="clang++" \
             i386_CC="i686-w64-mingw32-gcc" \
             x86_64_CC="x86_64-w64-mingw32-gcc" \
+            EGL_LIBS="-lEGL -lGLESv2" \
             ./configure \
               --build=x86_64-apple-darwin \
               --enable-archs=x86_64,i386 \
@@ -77,7 +78,7 @@
               --without-inotify \
               --with-sdl \
               --with-vulkan \
-              --without-opengl \
+              --with-opengl \
               --with-pthread \
               --without-x \
               --without-wayland \
@@ -274,6 +275,8 @@
                     gst_all_1.gstreamer
                     gst_all_1.gst-plugins-base
                     angle
+                    vulkan-loader
+                    moltenvk
                   ]
                 )
               }:$PKG_CONFIG_PATH"
@@ -282,8 +285,9 @@
 
               export CFLAGS="\
                 -mmacosx-version-min=15.0 \
-                -isysroot $SDKROOT"
-
+                -isysroot $SDKROOT \
+                -I${pkgs.lib.getDev pkgs.angle}/include"
+                
               export DYLD_LIBRARY_PATH="${
                 pkgs.lib.makeLibraryPath (
                   with pkgs;

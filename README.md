@@ -53,7 +53,7 @@ make: *** [Makefile:217149: install] Error 1
 
 `make install` breaks if the working directory path contains spaces (e.g., `untitled folder`). Rename it to something like `untitled_folder` and rerun.
 
-#### Verifying Cross-Compiler & ccache Config
+#### Verifying Cross-Compiler & ccache Config (NOT USED ANYMORE)
 
 After configuring, verify that `ccache` is correctly wired into the PE cross-compilers:
 
@@ -129,6 +129,12 @@ tools/winegcc/winegcc -o dlls/atmlib/x86_64-windows/atmlib.dll \
 ```bash
 temp_pkg="angle" && nix shell "nixpkgs#legacyPackages.x86_64-darwin.$temp_pkg" -c bash -c "cd \$(nix eval --raw nixpkgs#legacyPackages.x86_64-darwin.$temp_pkg.outPath) && exec bash"
 ```
+### Experimental: LibEGL
+
+> grep -i EGL sources/wine/include/config.h 
+
+> grep -E "(checking for.*EGL|checking for.*egl.h)" sources/wine/config.log -A 25 
+
 
 ## Testing DXMT & MoltenVK
 
@@ -230,6 +236,7 @@ export MTL_HUD_ENABLED=1
 
 A successful installation produces zero `not found` errors. Upon opening DxCapsViewer, verify your Apple Silicon GPU is listed in the **Direct3D 11** tab with feature levels **11.0–11.4** and **10.0–10.1**. *(Note: `dxdiag` or D3D9 operations will correctly fallback to standard `wined3d`, logging `wined3d_guess_card_vendor "Apple"`. This is expected).*
 
+
 ## Variants
 
 ### Xcode + Clang Only (`xcode_old.nix`)
@@ -239,3 +246,4 @@ An older alternative predating the MinGW switch. Uses Xcode's system clang for b
 ```bash
 cp xcode_old.nix flake.nix
 ```
+
