@@ -312,6 +312,7 @@
               export CCACHE_BASEDIR="$(pwd)"
               export CCACHE_COMPILERCHECK=content
               export CCACHE_MAXSIZE="5G"
+              export PATH="$CCACHE_DIR/bin:$PATH"
 
               rm -r "$CCACHE_DIR/bin" 2>/dev/null || true
               mkdir -p "$CCACHE_DIR/bin"
@@ -321,28 +322,26 @@
               ln -sf "${pkgs.ccache}/bin/ccache" "$CCACHE_DIR/bin/cc"
               ln -sf "${pkgs.ccache}/bin/ccache" "$CCACHE_DIR/bin/c++"
 
-              # ===== WINGW HIJACK STARTS
+              # ===== MINGW HIJACK STARTS =====
 
-              # Hijack MinGW compilers via Wrapper Scripts to prevent macOS EPERM under winebuild
-              echo '#!/usr/bin/env bash' > "$CCACHE_DIR/bin/i686-w64-mingw32-gcc"
-              echo 'exec ${pkgs.ccache}/bin/ccache ${pkgs.pkgsCross.mingw32.buildPackages.gcc}/bin/i686-w64-mingw32-gcc "$@"' >> "$CCACHE_DIR/bin/i686-w64-mingw32-gcc"
-              chmod +x "$CCACHE_DIR/bin/i686-w64-mingw32-gcc"
+              # MinGW compilers can't be plain ccache symlinks because winebuild
+              # triggers EPERM on macOS, so we use wrapper scripts that pin the
+              # keeps the cache key based on binary content, so these stay
+              # consistent with the symlinked native compilers.
 
-              echo '#!/usr/bin/env bash' > "$CCACHE_DIR/bin/i686-w64-mingw32-g++"
-              echo 'exec ${pkgs.ccache}/bin/ccache ${pkgs.pkgsCross.mingw32.buildPackages.gcc}/bin/i686-w64-mingw32-g++ "$@"' >> "$CCACHE_DIR/bin/i686-w64-mingw32-g++"
-              chmod +x "$CCACHE_DIR/bin/i686-w64-mingw32-g++"
+              mk_mingw_wrapper() {
+                # $1 = wrapper name, $2 = real compiler path
+                {
+                  echo '#!/usr/bin/env bash'
+                  echo "exec ${pkgs.ccache}/bin/ccache \"$2\" \"\$@\""
+                } > "$CCACHE_DIR/bin/$1"
+                chmod +x "$CCACHE_DIR/bin/$1"
+              }
 
-              echo '#!/usr/bin/env bash' > "$CCACHE_DIR/bin/x86_64-w64-mingw32-gcc"
-              echo 'exec ${pkgs.ccache}/bin/ccache ${pkgs.pkgsCross.mingwW64.buildPackages.gcc}/bin/x86_64-w64-mingw32-gcc "$@"' >> "$CCACHE_DIR/bin/x86_64-w64-mingw32-gcc"
-              chmod +x "$CCACHE_DIR/bin/x86_64-w64-mingw32-gcc"
-
-              echo '#!/usr/bin/env bash' > "$CCACHE_DIR/bin/x86_64-w64-mingw32-g++"
-              echo 'exec ${pkgs.ccache}/bin/ccache ${pkgs.pkgsCross.mingwW64.buildPackages.gcc}/bin/x86_64-w64-mingw32-g++ "$@"' >> "$CCACHE_DIR/bin/x86_64-w64-mingw32-g++"
-              chmod +x "$CCACHE_DIR/bin/x86_64-w64-mingw32-g++"
-
-              # ===== WINGW HIJACK ENDS
-
-              export PATH="$CCACHE_DIR/bin:$PATH"
+              mk_mingw_wrapper i686-w64-mingw32-gcc   "${pkgs.pkgsCross.mingw32.buildPackages.gcc}/bin/i686-w64-mingw32-gcc"
+              mk_mingw_wrapper i686-w64-mingw32-g++   "${pkgs.pkgsCross.mingw32.buildPackages.gcc}/bin/i686-w64-mingw32-g++"
+              mk_mingw_wrapper x86_64-w64-mingw32-gcc "${pkgs.pkgsCross.mingwW64.buildPackages.gcc}/bin/x86_64-w64-mingw32-gcc"
+              mk_mingw_wrapper x86_64-w64-mingw32-g++ "${pkgs.pkgsCross.mingwW64.buildPackages.gcc}/bin/x86_64-w64-mingw32-g++"
 
               echo "Nix environment ready!"
               echo "Self: ${self}"
