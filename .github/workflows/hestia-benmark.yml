@@ -1,4 +1,4 @@
-name: Benchmark Nix Caches
+name: hestia vs magic-nix-cache benchmark
 
 on:
   workflow_dispatch:

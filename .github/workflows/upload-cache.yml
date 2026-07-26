@@ -1,4 +1,4 @@
-name: Download Cache and Upload as Artifact
+name: Upload ccache as Artifact
 
 on:
   workflow_dispatch:

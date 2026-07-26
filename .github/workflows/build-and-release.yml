@@ -165,7 +165,6 @@ jobs:
           fi
 
       - name: Preheat Nix Environment
-        if: steps.mode.outputs.mode == 'crossover'
         run: $NIX_DEV true
 
       - name: Extract CrossOver Package

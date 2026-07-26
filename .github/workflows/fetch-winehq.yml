@@ -1,4 +1,4 @@
-name: Update WineHQ Sources
+name: Fetch WineHQ Sources
 
 on:
   schedule:

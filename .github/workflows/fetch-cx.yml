@@ -1,4 +1,4 @@
-name: Download CrossOver Sources
+name: Fetch CrossOver Sources
 
 on:
   workflow_dispatch:
