@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: 2026 Claire Tam <claire2026t@posteo.net>
+#
+# SPDX-License-Identifier: GPL-3.0-only
+
+name: Bump Sources (nvfetcher)
+
+on:
+  schedule:
+    - cron: "17 15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install Nix & Magic Cache
+        uses: nixbuild/nix-quick-install-action@v35
+      - uses: Mic92/hestia@v3
+
+      - name: Fetch Updates
+        run: |
+          for i in {1..5}; do
+            nix develop ".#default" --command wine-fetch && exit 0
+            s=$?
+            echo "wine-fetch failed, retrying ($i/5) in 10 seconds..."
+            sleep 10
+          done
+          exit "$s"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: bump/upstream-sources
+          title: "Update Upstream Sources (WineHQ)"
+          commit-message: "chore(sources): bump upstream wine refs"
+          body: |
+            Automated nvfetcher run detected upstream updates to Wine Master/Stable.

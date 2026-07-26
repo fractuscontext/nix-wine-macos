@@ -1,0 +1,13 @@
+[wine-master]
+src.git = "https://gitlab.winehq.org/wine/wine.git"
+src.branch = "master"
+fetch.git = "https://gitlab.winehq.org/wine/wine.git"
+
+[wine-stable]
+src.git = "https://gitlab.winehq.org/wine/wine.git"
+src.branch = "stable"
+fetch.git = "https://gitlab.winehq.org/wine/wine.git"
+
+[crossover-source]
+src.manual = "26.3.0"
+fetch.url = "https://media.codeweavers.com/pub/crossover/source/crossover-sources-$ver.tar.gz"

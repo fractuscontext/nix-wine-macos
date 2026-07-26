@@ -2,3 +2,4 @@ sources/
 .ccache/
 output/
 debug_suite/
+.pre-commit-config.yaml

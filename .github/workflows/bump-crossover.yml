@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: 2026 Claire Tam <claire2026t@posteo.net>
+#
+# SPDX-License-Identifier: GPL-3.0-only
+
+name: Bump CrossOver Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "New CrossOver Version (e.g. 26.3.0 or 23.7.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump-crossover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install Nix & Magic Cache
+        uses: nixbuild/nix-quick-install-action@v35
+      - uses: Mic92/hestia@v3
+
+      - name: Update nvfetcher.toml
+        run: |
+          sed -i 's/src.manual = ".*"/src.manual = "${{ inputs.version }}"/' nvfetcher.toml
+
+      - name: Regenerate Sources Lockfile
+        run: |
+          for i in {1..5}; do
+            nix develop ".#default" --command wine-fetch && exit 0
+            s=$?
+            echo "wine-fetch failed, retrying ($i/5) in 10 seconds..."
+            sleep 10
+          done
+          exit "$s"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: bump/crossover-${{ inputs.version }}
+          title: "Update CrossOver sources to ${{ inputs.version }}"
+          commit-message: "chore(sources): bump crossover to ${{ inputs.version }}"
+          body: |
+            Automated update to CrossOver `${{ inputs.version }}`.
+
+            This PR updates the `nvfetcher.toml` manual pin and regenerates the Nix source hashes.

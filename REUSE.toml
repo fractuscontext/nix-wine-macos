@@ -1,0 +1,18 @@
+version = 1
+
+[[annotations]]
+path = [
+    "*.lock",
+    "*.json",
+    "*.gitignore",
+    "*.gitattributes",
+    ".editorconfig",
+    ".vscode/settings.json",
+    ".github/dependabot.yml",
+    "nvfetcher.toml",
+    "_sources/*",
+
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "None"
+SPDX-License-Identifier = "CC0-1.0"
