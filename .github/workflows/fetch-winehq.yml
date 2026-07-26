@@ -25,7 +25,7 @@ jobs:
 
       - name: Install Nix & Magic Cache
         uses: nixbuild/nix-quick-install-action@v35
-      - uses: Mic92/hestia@v2
+      - uses: Mic92/hestia@v3
 
       - name: Update and Check Changes
         id: compare
@@ -92,7 +92,7 @@ jobs:
 
       - name: Install Nix & Magic Cache
         uses: nixbuild/nix-quick-install-action@v35
-      - uses: Mic92/hestia@v2
+      - uses: Mic92/hestia@v3
 
       - name: Update pin file
         run: |
