@@ -1,0 +1,77 @@
+name: Download CrossOver Sources
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_url:
+        description: "URL of the new CrossOver source tarball"
+        required: true
+        type: string
+        default: "https://media.codeweavers.com/pub/crossover/source/crossover-sources-26.3.0.tar.gz"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-tarball:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+          persist-credentials: false
+
+      - name: Download New Source and Purge Old
+        id: download
+        run: |
+          URL="${{ github.event.inputs.source_url }}"
+          FILENAME=$(basename "$URL")
+          echo "Target filename: $FILENAME"
+
+          if [ -f "$FILENAME" ]; then
+            echo "File $FILENAME already exists in the repo. Skipping update."
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Removing old tarballs..."
+          # Grab the old filenames so we can also clean their .gitattributes lines
+          OLD_FILES=$(git ls-files 'crossover-sources-*.tar.gz' || true)
+
+          git rm --ignore-unmatch crossover-sources-*.tar.gz || true
+
+          # Strip old literal LFS entries from .gitattributes
+          if [ -f .gitattributes ]; then
+            for f in $OLD_FILES; do
+              # escape dots for sed safety
+              esc=$(printf '%s\n' "$f" | sed 's/[.[\*^$/]/\\&/g')
+              sed -i "/^${esc} /d" .gitattributes
+            done
+          fi
+
+          echo "Downloading $FILENAME from $URL..."
+          curl -L -o "$FILENAME" "$URL"
+
+          # Add the new literal LFS entry for this specific version
+          echo "$FILENAME filter=lfs diff=lfs merge=lfs -text" >> .gitattributes
+          git add .gitattributes
+
+          echo "filename=$FILENAME" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        if: steps.download.outputs.skip != 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          commit-message: "chore(sources): bump crossover tarball to ${{ steps.download.outputs.filename }}"
+          title: "Update CrossOver sources to ${{ steps.download.outputs.filename }}"
+          body: |
+            Automated source update triggered via `workflow_dispatch`.
+
+            - **Source URL:** `${{ github.event.inputs.source_url }}`
+            - **New File:** `${{ steps.download.outputs.filename }}`
+
+            *The old tarball has been automatically detached from tracking to maintain structural integrity.*
+          branch: update-crossover-sources
+          delete-branch: true

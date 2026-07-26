@@ -1,0 +1,63 @@
+name: PR Comment Build Trigger
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  pull-requests: read
+  actions: write # Required to trigger another workflow
+
+jobs:
+  build-command:
+    if: >
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/build') &&
+      (github.event.comment.author_association == 'OWNER' ||
+       github.event.comment.author_association == 'COLLABORATOR' ||
+       github.event.comment.author_association == 'MEMBER')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Acknowledge command
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'rocket'
+            })
+
+      - name: Parse command and get PR branch
+        id: parse
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMENT=$(echo "${{ github.event.comment.body }}" | tr -d '\r')
+
+          # Determine requested source_mode from the comment
+          MODE="crossover"
+          if [[ "$COMMENT" == *"/build stable"* ]]; then
+            MODE="stable"
+          elif [[ "$COMMENT" == *"/build master"* ]]; then
+            MODE="master"
+          fi
+
+          echo "Detected mode: $MODE"
+
+          # Get the branch name of the PR so the build runs on the new code
+          PR_BRANCH=$(gh pr view ${{ github.event.issue.number }} --repo ${{ github.repository }} --json headRefName -q .headRefName)
+          echo "branch=$PR_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch to build-and-release.yml
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Triggering build-and-release.yml on branch: ${{ steps.parse.outputs.branch }} with mode: ${{ steps.parse.outputs.mode }}"
+
+          gh workflow run build-and-release.yml \
+            --ref "${{ steps.parse.outputs.branch }}" \
+            -f source_mode="${{ steps.parse.outputs.mode }}" \
+            -f validate_only=false

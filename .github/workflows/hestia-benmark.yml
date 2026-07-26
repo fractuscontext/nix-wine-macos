@@ -1,0 +1,40 @@
+name: Benchmark Nix Caches
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cache-race:
+    strategy:
+      fail-fast: false
+      matrix:
+        cache: ["magic-nix-cache", "hestia"]
+
+    runs-on: macos-15-intel
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Nix
+        uses: nixbuild/nix-quick-install-action@v35
+
+      - name: Start Magic Nix Cache
+        if: matrix.cache == 'magic-nix-cache'
+        uses: DeterminateSystems/magic-nix-cache-action@v14
+
+      - name: Download Custom Hestia
+        if: matrix.cache == 'hestia'
+        run: |
+          curl -L -o hestia-daemon "https://github.com/fractuscontext/hestia-macos-intel/releases/download/hestia-v3-darwin-x86/hestia-x86_64-darwin"
+          chmod +x hestia-daemon
+
+      - name: Start Hestia
+        if: matrix.cache == 'hestia'
+        uses: Mic92/hestia@v3
+        with:
+          binary: ./hestia-daemon
+
+      - name: Dev Shell Instantiation
+        run: |
+          echo "Benchmarking ${{ matrix.cache }}..."
+          time nix develop .#default --command echo "hello world"

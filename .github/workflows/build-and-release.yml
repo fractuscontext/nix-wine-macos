@@ -1,0 +1,245 @@
+name: Build Wine on amd64 Darwin
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: [".github/workflows/**", "README.md"]
+  workflow_dispatch:
+    inputs:
+      source_mode:
+        description: "Which Wine flavor to compile?"
+        type: choice
+        options:
+          - crossover
+          - stable
+          - master
+        default: "crossover"
+      stable_commit:
+        description: "(Optional) Specific stable commit hash to test. Leave blank to use upstream_wine.json"
+        type: string
+        default: ""
+      master_commit:
+        description: "(Optional) Specific master commit hash to test. Leave blank to use upstream_wine.json"
+        type: string
+        default: ""
+      validate_only:
+        description: "Skip compiling and packaging (configure only)"
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      source_mode:
+        type: string
+        default: ""
+      stable_commit:
+        type: string
+        default: ""
+      master_commit:
+        type: string
+        default: ""
+      validate_only:
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.source_mode || 'crossover' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15-intel
+    env:
+      NIX_DEV: nix develop .#default --system x86_64-darwin --command
+    outputs:
+      wine_tag: ${{ steps.wine_version.outputs.tag }}
+      should_build: ${{ steps.build_decision.outputs.build }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+          fetch-depth: 2
+
+      - name: Install Nix & Magic Cache
+        uses: nixbuild/nix-quick-install-action@v35
+
+      - name: Download Hestia for Intel Mac
+        run: |
+          # Download retry logic
+          for i in {1..5}; do
+            # Using --fail makes curl return a non-zero exit code on HTTP errors (e.g. 503/404)
+            curl --fail -L -o hestia-daemon "https://github.com/fractuscontext/hestia-macos-intel/releases/download/hestia-v3-darwin-x86/hestia-x86_64-darwin" && s=0 && break || s=$?
+            echo "Hestia download failed, retrying ($i/5) in 5 seconds..."
+            sleep 5
+          done
+          (exit $s)
+          chmod +x hestia-daemon
+
+      - name: Start Hestia Cache
+        uses: Mic92/hestia@v3
+        with:
+          binary: ./hestia-daemon
+
+      - name: Determine if we should compile & package
+        id: build_decision
+        run: |
+          if [ "${{ inputs.validate_only }}" = "true" ] || [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "Mode: Validate Only (Skipping Compile/Bundle)"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "Mode: Full Build & Package"
+          fi
+
+      - name: Determine source mode
+        id: mode
+        run: |
+          BEFORE_SHA="${{ github.event.before }}"
+          if [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            BEFORE_SHA="HEAD^"
+          fi
+
+          if [ -n "${{ inputs.source_mode }}" ]; then
+            MODE="${{ inputs.source_mode }}"
+            if [ "$MODE" = "stable" ]; then
+              COMMIT="${{ inputs.stable_commit }}"
+            elif [ "$MODE" = "master" ]; then
+              COMMIT="${{ inputs.master_commit }}"
+            else
+              COMMIT=""
+            fi
+          elif git diff --name-only "$BEFORE_SHA" HEAD 2>/dev/null | grep -qx 'upstream_wine.json'; then
+            # Default to stable if triggered gracefully by an undirected push (extendible later)
+            MODE="stable"
+            COMMIT=$(jq -r '.stable.commit' upstream_wine.json)
+          else
+            MODE="crossover"
+            COMMIT=""
+          fi
+
+          # Fallback: Read the correct JSON pin if omitted in inputs!
+          if [ -z "$COMMIT" ]; then
+            if [ "$MODE" = "stable" ]; then
+              COMMIT=$(jq -r '.stable.commit' upstream_wine.json)
+            elif [ "$MODE" = "master" ]; then
+              COMMIT=$(jq -r '.master.commit' upstream_wine.json)
+            fi
+          fi
+
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+          echo "Source mode: $MODE ($COMMIT)"
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: .ccache
+          key: ${{ runner.os }}-ccache-${{ steps.mode.outputs.mode }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-${{ steps.mode.outputs.mode }}-
+
+      - name: Fetch Upstream Wine (pinned)
+        if: steps.mode.outputs.mode == 'stable' || steps.mode.outputs.mode == 'master'
+        run: |
+          mkdir -p sources
+          git init sources/wine
+          git -C sources/wine remote add origin https://gitlab.winehq.org/wine/wine.git
+
+          for i in {1..5}; do
+            git -C sources/wine fetch --depth 1 origin "${{ steps.mode.outputs.commit }}" && s=0 && break || s=$?
+            echo "Fetch failed, retrying ($i/5) in 10 seconds..."
+            sleep 10
+          done
+          (exit $s)
+
+          git -C sources/wine checkout --detach FETCH_HEAD
+
+          ACTUAL=$(git -C sources/wine rev-parse HEAD)
+          if [ "$ACTUAL" != "${{ steps.mode.outputs.commit }}" ]; then
+            echo "Error: checked out $ACTUAL but pin says ${{ steps.mode.outputs.commit }}"
+            exit 1
+          fi
+
+      - name: Preheat Nix Environment
+        if: steps.mode.outputs.mode == 'crossover'
+        run: $NIX_DEV true
+
+      - name: Extract CrossOver Package
+        if: steps.mode.outputs.mode == 'crossover'
+        run: $NIX_DEV extract-wine
+
+      - name: Extract Wine Version
+        id: wine_version
+        run: |
+          FLAVOUR_PREFIX=$($NIX_DEV get-wine-flavour)
+
+          if [ "${{ steps.mode.outputs.mode }}" = "stable" ] || [ "${{ steps.mode.outputs.mode }}" = "master" ]; then
+            SHORT_SHA=$(echo "${{ steps.mode.outputs.commit }}" | cut -c1-7)
+          else
+            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          fi
+
+          TAG="${FLAVOUR_PREFIX}-${SHORT_SHA}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Detected: $TAG"
+
+      - name: Configure Wine
+        run: $NIX_DEV configure-wow64
+
+      - name: Compile Wine
+        if: steps.build_decision.outputs.build == 'true'
+        run: $NIX_DEV compile-wow64
+
+      - name: Install Wine
+        if: steps.build_decision.outputs.build == 'true'
+        run: $NIX_DEV install-wow64
+
+      - name: Bundle Dependencies
+        if: steps.build_decision.outputs.build == 'true'
+        run: $NIX_DEV bundle-wow64
+
+      - name: Save ccache
+        uses: actions/cache/save@v6
+        if: ${{ always() && steps.build_decision.outputs.build == 'true' }}
+        with:
+          path: .ccache
+          key: ${{ runner.os }}-ccache-${{ steps.mode.outputs.mode }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Upload Wine Build Artifact
+        uses: actions/upload-artifact@v7
+        if: steps.build_decision.outputs.build == 'true'
+        with:
+          name: wine-${{ steps.wine_version.outputs.tag }}-${{ github.run_id }}
+          path: output/
+          retention-days: 7
+
+  release:
+    needs: build
+    if: needs.build.outputs.should_build == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: wine-${{ needs.build.outputs.wine_tag }}-${{ github.run_id }}
+          path: output/
+          skip-decompress: true
+
+      - name: Prepare and Release
+        run: |
+          mv output/wine-*.zip wine-${{ needs.build.outputs.wine_tag }}.zip
+          echo "Zip size: $(du -sh *.zip | cut -f1)"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.build.outputs.wine_tag }}
+          name: ${{ needs.build.outputs.wine_tag }}
+          files: wine-${{ needs.build.outputs.wine_tag }}.zip
+          generate_release_notes: true
+          make_latest: true
