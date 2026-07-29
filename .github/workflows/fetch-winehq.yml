@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Claire Tam <claire2026t@posteo.net>
+#
+# SPDX-License-Identifier: CC0-1.0
+
 name: Fetch WineHQ Sources
 
 on:

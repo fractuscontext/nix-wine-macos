@@ -1,0 +1,16 @@
+version = 1
+
+[[annotations]]
+path = [
+    ".gitignore",
+    ".gitattributes",
+    "*.lock",
+    "*.json"
+]
+SPDX-FileCopyrightText = "System"
+SPDX-License-Identifier = "CC0-1.0"
+
+[[annotations]]
+path = "*.tar.gz"
+SPDX-FileCopyrightText = "Wine project authors"
+SPDX-License-Identifier = "LGPL-2.1-only"

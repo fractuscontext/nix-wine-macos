@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Claire Tam <claire2026t@posteo.net>
+#
+# SPDX-License-Identifier:  GPL-3.0-only
+
 {
   description = "CrossOver Wine Source Extractor";
 
@@ -149,7 +153,6 @@
 
               if [ "$REMOTE_COMMIT" != "$LOCAL_COMMIT" ]; then
                 echo "Updating $BRANCH: $LOCAL_COMMIT -> $REMOTE_COMMIT" >&2
-                local clone_dir
                 clone_dir=$(mktemp -d -t winepin-XXXXX)
                 ${pkgs.git}/bin/git clone --branch "$BRANCH" --single-branch \
                   https://gitlab.winehq.org/wine/wine.git --depth=1 "$clone_dir" -q
@@ -167,7 +170,6 @@
 
             if [ "$NEEDS_UPDATE" -eq 1 ]; then
               # Build the new JSON object from existing data and updates, atomically replace.
-              local tmpfile
               tmpfile=$(mktemp -t winepin-XXXXX.json)
               ${pkgs.jq}/bin/jq -c \
                 --arg b_master master --arg c_master "''${UPDATED_COMMIT[master]:-}" --arg t_master "''${UPDATED_TS[master]:-}" \

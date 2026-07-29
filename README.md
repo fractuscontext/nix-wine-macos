@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Claire Tam <claire2026t@posteo.net>
+
+SPDX-License-Identifier: GPL-3.0-only
+-->
+
 # Safer, Reproducible Wine Build for macOS
 
 Similar to [Gcenx/macOS_Wine_builds](https://github.com/Gcenx/macOS_Wine_builds), but safer and more transparent.
