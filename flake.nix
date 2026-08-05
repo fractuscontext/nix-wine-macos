@@ -151,43 +151,50 @@
 
           # Script 3: The actual macOS build script
           # (We only evaluate this if we are actually on macOS, avoiding cross-OS evaluation errors)
-          buildWowScript =
-            if isDarwin then
-              (import ./scripts/build-macos.nix {
-                inherit buildPkgs targetPkgs mac-bundler;
-                srcDir = "sources/wine";
-                installDir = "output/wow64";
-              })
-            else
-              buildPkgs.hello;
+          makeWowShell =
+            { isCi }:
+            let
+              buildWowScript =
+                if isDarwin then
+                  (import ./scripts/build-macos.nix {
+                    inherit buildPkgs targetPkgs mac-bundler;
+                    srcDir = "sources/wine";
+                    installDir = "output/wow64";
+                    silent = isCi;
+                  })
+                else
+                  buildPkgs.hello;
+            in
+            buildPkgs.mkShell {
+              name = if isCi then "wow64-ci-env" else "wow64-dev-env";
 
+              packages = [
+                buildPkgs.nvfetcher
+                wine-fetch
+                wine-extract
+              ]
+              ++ buildPkgs.lib.optionals isDarwin [ buildWowScript ];
+
+              shellHook = ''
+                ${pre-commit-check.shellHook}
+                echo "🍷 Loaded Wow64 build environment (CI: ${if isCi then "true" else "false"})"
+                if [ "${if isDarwin then "true" else "false"}" = "false" ]; then
+                  echo "Notice: You are on Linux. Only 'wine-fetch' is available here."
+                else
+                  echo "Standard Usage:"
+                  echo "  wine-fetch"
+                  echo "  wine-extract crossover"
+                  echo "  build-macos all"
+                fi
+              '';
+            };
         in
         {
-          default = buildPkgs.mkShell {
-            name = "wow64-dev-env";
+          # Locally, 'nix develop' uses this one (verbose)
+          default = makeWowShell { isCi = false; };
 
-            # We load the basic tools on all OSs, but buildWowScript only on Darwin
-            packages = [
-              buildPkgs.nvfetcher
-              wine-fetch
-              wine-extract
-            ]
-            ++ buildPkgs.lib.optionals isDarwin [ buildWowScript ];
-
-            shellHook = ''
-              ${pre-commit-check.shellHook}
-              echo "🍷 Loaded Wow64 build environment"
-
-              if [ "${if isDarwin then "true" else "false"}" = "false" ]; then
-                echo "Notice: You are on Linux. Only 'wine-fetch' is available here."
-              else
-                echo "Standard Usage:"
-                echo "  wine-fetch"
-                echo "  wine-extract crossover"
-                echo "  build-macos all"
-              fi
-            '';
-          };
+          # GitHub Actions will use this one (silent)
+          ci = makeWowShell { isCi = true; };
         }
       );
     };

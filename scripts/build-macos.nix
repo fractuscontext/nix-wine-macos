@@ -9,9 +9,12 @@
   srcDir ? "sources/wine",
   installDir ? "output/wow64",
   scriptName ? "build-macos",
+  silent ? false,
 }:
 
 let
+  vFlag = if silent then "" else "-v";
+
   dxvkPrecompiled = buildPkgs.fetchzip {
     url = "https://github.com/3Shain/dxmt/releases/download/v0.80/dxmt-v0.80-builtin.tar.gz";
     sha256 = "sha256-Ckrb/7B3+COEfu3iaqsXK1q0L9KbwIsUmEegSNbiznQ=";
@@ -86,9 +89,9 @@ buildPkgs.writeShellScriptBin scriptName ''
     )
   }:$PATH"
 
-  export MACOSX_DEPLOYMENT_TARGET="14.0"
+  export MACOSX_DEPLOYMENT_TARGET="15.0"
 
-  export SDKROOT="${targetPkgs.apple-sdk_14}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+  export SDKROOT="${targetPkgs.apple-sdk_15}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
 
   export PKG_CONFIG_PATH="${
     targetPkgs.lib.makeSearchPathOutput "dev" "lib/pkgconfig" baseDeps
@@ -96,12 +99,12 @@ buildPkgs.writeShellScriptBin scriptName ''
 
   export CFLAGS="\
     -target x86_64-apple-darwin \
-    -mmacosx-version-min=14.0 \
+    -mmacosx-version-min=15.0 \
     -isysroot $SDKROOT"
 
   export LDFLAGS="\
     -target x86_64-apple-darwin \
-    -mmacosx-version-min=14.0 \
+    -mmacosx-version-min=15.0 \
     -L${targetPkgs.moltenvk}/lib \
     -L${targetPkgs.vulkan-loader}/lib \
     -isysroot $SDKROOT \
@@ -132,11 +135,10 @@ buildPkgs.writeShellScriptBin scriptName ''
     } > "$CCACHE_DIR/bin/$bin_name"
     chmod +x "$CCACHE_DIR/bin/$bin_name"
   }
-
-  mk_wrapper clang   "${buildPkgs.llvmPackages.clang-unwrapped}/bin/clang" -v
-  mk_wrapper clang++ "${buildPkgs.llvmPackages.clang-unwrapped}/bin/clang++" -v
-  mk_wrapper cc      "${buildPkgs.llvmPackages.clang-unwrapped}/bin/clang" -v
-  mk_wrapper c++     "${buildPkgs.llvmPackages.clang-unwrapped}/bin/clang++" -v
+  mk_wrapper clang   "${buildPkgs.llvmPackages.clang-unwrapped}/bin/clang" ${vFlag}
+  mk_wrapper clang++ "${buildPkgs.llvmPackages.clang-unwrapped}/bin/clang++" ${vFlag}
+  mk_wrapper cc      "${buildPkgs.llvmPackages.clang-unwrapped}/bin/clang" ${vFlag}
+  mk_wrapper c++     "${buildPkgs.llvmPackages.clang-unwrapped}/bin/clang++" ${vFlag}
 
   do_configure() {
     echo "Configuring Wow64 in $SRC_DIR..."

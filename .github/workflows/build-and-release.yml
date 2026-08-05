@@ -98,7 +98,7 @@ jobs:
       fail-fast: false
 
     env:
-      NIX_DEV: nix develop .#default --command
+      NIX_DEV: "nix develop .#ci --command"
 
     outputs:
       wine_tag: ${{ steps.wine_version.outputs.tag }}
