@@ -1,0 +1,57 @@
+{
+    "crossover-source": {
+        "cargoLock": null,
+        "date": null,
+        "extract": null,
+        "name": "crossover-source",
+        "passthru": null,
+        "pinned": false,
+        "src": {
+            "name": null,
+            "sha256": "sha256-rJnIyks4SPPoF4QTXwI98ma2HCNFcm6lWlCz4DDdaHI=",
+            "type": "url",
+            "url": "https://media.codeweavers.com/pub/crossover/source/crossover-sources-26.3.0.tar.gz"
+        },
+        "version": "26.3.0"
+    },
+    "wine-master": {
+        "cargoLock": null,
+        "date": "2026-08-04",
+        "extract": null,
+        "name": "wine-master",
+        "passthru": null,
+        "pinned": false,
+        "src": {
+            "deepClone": false,
+            "fetchSubmodules": false,
+            "leaveDotGit": false,
+            "name": null,
+            "rev": "702e44767a8edb1cbd8731306389d0934c5f84d1",
+            "sha256": "sha256-AU65XlBX43P/gt52PW1CciytoOAjj0swRaOiDadQzI0=",
+            "sparseCheckout": [],
+            "type": "git",
+            "url": "https://gitlab.winehq.org/wine/wine.git"
+        },
+        "version": "702e44767a8edb1cbd8731306389d0934c5f84d1"
+    },
+    "wine-stable": {
+        "cargoLock": null,
+        "date": "2026-01-13",
+        "extract": null,
+        "name": "wine-stable",
+        "passthru": null,
+        "pinned": false,
+        "src": {
+            "deepClone": false,
+            "fetchSubmodules": false,
+            "leaveDotGit": false,
+            "name": null,
+            "rev": "db11d0fe6a169c457e23d007e20404643d067aa8",
+            "sha256": "sha256-3jJ2paulqgMLyLR8g5bxwJuuusAMZSrnw+X+nFhYt+c=",
+            "sparseCheckout": [],
+            "type": "git",
+            "url": "https://gitlab.winehq.org/wine/wine.git"
+        },
+        "version": "db11d0fe6a169c457e23d007e20404643d067aa8"
+    }
+}
