@@ -16,17 +16,17 @@
   };
   wine-master = {
     pname = "wine-master";
-    version = "702e44767a8edb1cbd8731306389d0934c5f84d1";
+    version = "a37867ddf8418439b37e062abe156a42accf4d32";
     src = fetchgit {
       url = "https://gitlab.winehq.org/wine/wine.git";
-      rev = "702e44767a8edb1cbd8731306389d0934c5f84d1";
+      rev = "a37867ddf8418439b37e062abe156a42accf4d32";
       fetchSubmodules = false;
       deepClone = false;
       leaveDotGit = false;
       sparseCheckout = [ ];
-      sha256 = "sha256-AU65XlBX43P/gt52PW1CciytoOAjj0swRaOiDadQzI0=";
+      sha256 = "sha256-i2wpD1y/8sGf3/1dKmtt+yJwePRad5BPQaOVCLFWcLU=";
     };
-    date = "2026-08-04";
+    date = "2026-08-06";
   };
   wine-stable = {
     pname = "wine-stable";
