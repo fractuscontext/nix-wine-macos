@@ -61,9 +61,14 @@ jobs:
             # Manual trigger: just test the selected flavor
             MATRIX=$(jq -n --arg m "${{ inputs.source_mode }}" '[$m]')
 
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            # PR trigger: Diff the new sources lockfile against the main branch
-            OLD=$(git show "origin/${{ github.base_ref }}:_sources/generated.json" 2>/dev/null || echo "{}")
+          elif [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.event_name }}" = "push" ]; then
+            # Diff the new sources lockfile against the base branch (PR) or previous commit (Push)
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              OLD=$(git show "origin/${{ github.base_ref }}:_sources/generated.json" 2>/dev/null || echo "{}")
+            else
+              OLD=$(git show "HEAD~1:_sources/generated.json" 2>/dev/null || echo "{}")
+            fi
+
             NEW=$(cat _sources/generated.json 2>/dev/null || echo "{}")
 
             # Check which specific flavors bumped
@@ -78,11 +83,11 @@ jobs:
               fi
             done
 
-            # Fallback if the PR doesn't touch sources (e.g. testing script changes)
+            # Fallback if the PR/Commit doesn't touch sources (e.g. testing script changes)
             if [ "$MATRIX" = "[]" ]; then MATRIX="[\"crossover\"]"; fi
 
           else
-            # Push to main branch: build crossover by default
+            # Fallback for any other event types
             MATRIX="[\"crossover\"]"
           fi
 
