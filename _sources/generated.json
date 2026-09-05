@@ -16,7 +16,7 @@
     },
     "wine-master": {
         "cargoLock": null,
-        "date": "2026-09-02",
+        "date": "2026-09-04",
         "extract": null,
         "name": "wine-master",
         "passthru": null,
@@ -26,13 +26,13 @@
             "fetchSubmodules": false,
             "leaveDotGit": false,
             "name": null,
-            "rev": "dfa9629347841de01d6a2113eab3ecf886e017fc",
-            "sha256": "sha256-QLqcO+LOKIiCunK5fTm7yOy2RZyNLqQowHmdlux+CWk=",
+            "rev": "36b6a2cf679fb395f668a917b76537190e212d9c",
+            "sha256": "sha256-PXk0yjmLgLbZ2EGUyFoK67zmqFWL7eVQfbuCyVgyU3w=",
             "sparseCheckout": [],
             "type": "git",
             "url": "https://gitlab.winehq.org/wine/wine.git"
         },
-        "version": "dfa9629347841de01d6a2113eab3ecf886e017fc"
+        "version": "36b6a2cf679fb395f668a917b76537190e212d9c"
     },
     "wine-stable": {
         "cargoLock": null,
